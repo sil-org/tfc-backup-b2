@@ -1,7 +1,7 @@
 - name: push_branch
   service: app
   type: push
-  image_name: silinternational/tfc-backup-b2
+  image_name: silintl/tfc-backup-b2
   image_tag: "{{.Branch}}"
   exclude: (master|main|snyk*)
   registry: https://index.docker.io/v1/
@@ -10,7 +10,7 @@
 - name: push_latest
   service: app
   type: push
-  image_name: silinternational/tfc-backup-b2
+  image_name: silintl/tfc-backup-b2
   image_tag: "latest"
   tag: main
   registry: https://index.docker.io/v1/
