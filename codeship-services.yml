@@ -1,0 +1,5 @@
+app:
+  build:
+    image: silinternational/tfc-backup-b2
+    dockerfile: ./Dockerfile
+  cached: true

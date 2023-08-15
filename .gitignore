@@ -9,3 +9,9 @@
 node_modules/
 vendor/
 .terraform/
+
+# tfc-dump creates .json files that don't belong in version control
+*.json
+*.env
+*.aes
+dockercfg
