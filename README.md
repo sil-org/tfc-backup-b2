@@ -36,8 +36,8 @@ Spaces in the variable set name are replaced with hyphens (`-`).
 1. Add the B2 bucket name to `RESTIC_REPOSITORY` in `local.env`.
 1. Obtain a Backblaze Application Key. Restrict its access to the B2 bucket you just created. Ensure the application key has these capabilities: `deleteFiles`, `listBuckets`, `listFiles`, `readBuckets`, `readFiles`, `writeBuckets`, `writeFiles`.
 1. Add the application key and secret to `local.env` as the values of `B2_ACCOUNT_ID` and `B2_ACCOUNT_KEY` respectively.
-1. Initialize the Restic repository (one time only):  `docker run --env-file=local.env --env BACKUP_MODE=init tfc-backup-b2:latest`
-1. Run the Docker image:  `docker run --env-file=local.env tfc-backup-b2:latest`
+1. Initialize the Restic repository (one time only):  `docker run --env-file=local.env --env BACKUP_MODE=init silintl/tfc-backup-b2:latest`
+1. Run the Docker image:  `docker run --env-file=local.env silintl/tfc-backup-b2:latest`
 
 ### Variables
 
