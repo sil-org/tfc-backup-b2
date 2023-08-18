@@ -95,7 +95,7 @@ foreach (sort keys %workspace_list) {
 
 	# Dump the workspace info
 	$curl_query = "\"https://app.terraform.io/api/v2/workspaces/$workspace_list{$_}\"";
-	$curl_cmd   = "curl $curl_headers --output $_-workspace.json $curl_query";
+	$curl_cmd   = "curl $curl_headers --output $_-attributes.json $curl_query";
 	system($curl_cmd);
 
 	# Dump the variables info
@@ -145,7 +145,7 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 
 	# Get the Variable Set
 	$curl_query = "\"https://app.terraform.io/api/v2/varsets/$vs_ids[$ii]\"";
-	$curl_cmd   = "curl $curl_headers --output varset-${filename}.json $curl_query";
+	$curl_cmd   = "curl $curl_headers --output varset-${filename}-attributes.json $curl_query";
 	system($curl_cmd);
 
 	# Get the variables within the Variable Set

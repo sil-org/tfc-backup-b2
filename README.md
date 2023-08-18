@@ -16,12 +16,12 @@ B2 bucket.
 
 Two files are created for each Terraform Cloud workspace:
 
-- _workspace-name_-workspace.json
+- _workspace-name_-attributes.json
 - _workspace-name_-variables.json
 
 Two files are created for each Terraform Cloud Variable Set:
 
-- varset-_variable-set-name_.json
+- varset-_variable-set-name_-attributes.json
 - varset-_variable-set-name_-variables.json
 
 Spaces in the variable set name are replaced with hyphens (`-`).
