@@ -1,5 +1,3 @@
 *.aes
-codeship-services.yml
-codeship-steps.yml
 dockercfg
 *.env
