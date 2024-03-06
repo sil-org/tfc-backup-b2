@@ -4,7 +4,7 @@ FROM alpine:3
 # "--build-arg var=value".  They are not available in the running container.
 ARG restic_ver=0.16.0
 ARG tfc_ops_ver=3.5.4
-ARG tfc_ops_distrib=tfc-ops_${tfc_ops_ver}_Linux_x86_64.tar.gz
+ARG tfc_ops_distrib=tfc-ops_Linux_x86_64.tar.gz
 
 # Install Restic, tfc-ops, perl, and jq
 RUN cd /tmp \
