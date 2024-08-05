@@ -109,16 +109,18 @@ foreach (sort keys %workspace_list) {
 ### WARNING ###
 #
 # This code assumes that all of the TFC Variable Sets are contained within
-# the first result page of 20 entries.  This was true for SIL in December 2022.
+# the first result page of 100 entries.  This was true for SIL in August 2024.
 #
 ####
 
 my @vs_names;
 my @vs_ids;
+my $pg_size = 100;
+my $total_count;
 my $tmpfile = `mktemp`;
 chomp($tmpfile);
 
-$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets\"";
+$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}\"";
 $curl_cmd   = "curl $curl_headers --output $tmpfile $curl_query";
 system($curl_cmd);
 
@@ -154,6 +156,15 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 	system($curl_cmd);
 }
 
+# Get the number of Variable Sets
+
+$jq_cmd      = "cat $tmpfile | jq '.meta.total-count'";
+$total_count = `$jq_cmd`;
 unlink($tmpfile);
+
+if ($total_count > $pg_size) {
+	print STDERR "WARNING: ${total_count}-${pg_size} Variable Sets were not backed up.\n";
+	exit(1);
+}
 
 exit(0);
