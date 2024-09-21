@@ -158,7 +158,7 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 
 # Get the number of Variable Sets
 
-$jq_cmd      = "cat $tmpfile | jq '.meta.total-count'";
+$jq_cmd      = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
 $total_count = `$jq_cmd`;
 unlink($tmpfile);
 
