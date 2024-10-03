@@ -37,5 +37,5 @@ jobs:
           push: true      
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:docker-dev
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:silintl-docker-dev
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:silintl-tfc-backup-b2
           labels: ${{ steps.meta.outputs.labels }}
