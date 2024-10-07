@@ -3,7 +3,7 @@ name: Build and Publish
 on:
   push:
     branches: [ 'main' ]  # Trigger on push to 'main'
-    tags: [ '[0-9]+.[0-9]+.[0-9]' ]  # Trigger on version tags like '0.1.0'
+    tags: [ '[0-9]+.[0-9]+.[0-9]+' ]  # Trigger on version tags like '0.1.0'
 
 jobs:
   build-and-publish:
