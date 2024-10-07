@@ -3,11 +3,11 @@ name: Build and Publish
 on:
   push:
     branches: [ 'develop' ]
-    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
+    tags: [ '[0-9]+.[0-9]+.[0-9]' ]
 
 jobs:
   build-and-publish:
-    name: Build and Publish Docker Image
+    name: Build and Publish Docker image 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,6 +26,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+          
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -34,17 +35,17 @@ jobs:
             ${{ vars.DOCKER_ORG }}/${{ github.event.repository.name }}
             ghcr.io/${{ github.repository }}
           tags: |
-            # Apply 'latest' tag for the 'develop' branch only
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/develop' }} 
-            # Apply semantic versioning tags when a version tag (e.g., v1.0.0) is pushed
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=ref,event=branch  # Tag with branch name
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/develop' }}  # Tag as 'latest' if it's the 'develop' branch
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
 
+            
       - name: Build and push Docker image to Docker Hub and GHCR
         uses: docker/build-push-action@v5
         with:
