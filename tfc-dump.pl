@@ -13,8 +13,7 @@
 # Uses curl(1), jq(1), tfc-ops(https://github.com/silinternational/tfc-ops).
 # Version 3.0.0 of tfc-ops was used during development.
 #
-# Dale Newby
-# SIL International
+# SIL - GTIS
 # December 2, 2022
 
 use strict;
