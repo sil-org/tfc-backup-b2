@@ -114,30 +114,40 @@ foreach (sort keys %workspace_list) {
 
 my @vs_names;
 my @vs_ids;
-my $pg_size = 100;
+my $pg_size = 20;
+my $pg_num = 1;
 my $total_count;
 my $tmpfile = `mktemp`;
 chomp($tmpfile);
 
-$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}\"";
-$curl_cmd   = "curl $curl_headers --output $tmpfile $curl_query";
-system($curl_cmd);
+do {
+	$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}&page%5number%5D=${pg_num}\"";
+	$curl_cmd   = "curl $curl_headers --output $tmpfile $curl_query";
+	system($curl_cmd);
 
-# Get the Variable Set names
+	# Get the Variable Set names
+	$jq_cmd   = "cat $tmpfile | jq '.data[].attributes.name'";
+	my @page_names = `$jq_cmd`;
 
-$jq_cmd   = "cat $tmpfile | jq '.data[].attributes.name'";
-@vs_names = `$jq_cmd`;
-# Remove the double quotes in each element of the array.
-grep($_ =~ s/"//g && 0, @vs_names);	# Programming Perl, p. 221, 1990
-chomp(@vs_names);
+	# Remove the double quotes in each element of the array.
+	grep($_ =~ s/"//g && 0, @page_names);	# Programming Perl, p. 221, 1990
+	chomp(@page_names);
+	push(@vs_names, @page_names);
 
-# Get the Variable Set IDs
+	# Get the Variable Set IDs from this page
+    $jq_cmd = "cat $tmpfile | jq '.data[].id'";
+    my @page_ids = `$jq_cmd`;
+    grep($_ =~ s/"//g && 0, @page_ids);
+    chomp(@page_ids);
+    push(@vs_ids, @page_ids);
 
-$jq_cmd = "cat $tmpfile | jq '.data[].id'";
-@vs_ids = `$jq_cmd`;
-# Remove the double quotes in each element of the array.
-grep($_ =~ s/"//g && 0, @vs_ids);	# Programming Perl, p. 221, 1990
-chomp(@vs_ids);
+	# Get pagination metadata
+    $jq_cmd = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
+    $total_count = `$jq_cmd`;
+    chomp($total_count);
+    $pg_num++;
+} 
+while (scalar(@vs_ids) < $total_count);
 
 my $filename;
 for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
@@ -156,14 +166,11 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 }
 
 # Get the number of Variable Sets
-
-$jq_cmd      = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
-$total_count = `$jq_cmd`;
-unlink($tmpfile);
-
-if ($total_count > $pg_size) {
-	print STDERR "WARNING: ${total_count}-${pg_size} Variable Sets were not backed up.\n";
-	exit(1);
-}
-
+# $jq_cmd      = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
+# $total_count = `$jq_cmd`;
+	unlink($tmpfile);
+# if ($total_count > $pg_size) {
+# 	print STDERR "WARNING: ${total_count}-${pg_size} Variable Sets were not backed up.\n";
+# 	exit(1);
+# }
 exit(0);
