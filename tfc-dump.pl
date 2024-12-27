@@ -114,7 +114,7 @@ foreach (sort keys %workspace_list) {
 
 my @vs_names;
 my @vs_ids;
-my $pg_size = 20;
+my $pg_size = 100;
 my $pg_num = 1;
 my $total_count;
 my $tmpfile = `mktemp`;
