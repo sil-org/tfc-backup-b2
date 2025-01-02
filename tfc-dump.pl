@@ -130,7 +130,7 @@ do {
 	my @page_names = `$jq_cmd`;
 
 	# Remove the double quotes in each element of the array.
-	grep($_ =~ s/"//g && 0, @page_names);	# Programming Perl, p. 221, 1990
+	@page_names = map { s/"//gr } @page_names;
 	chomp(@page_names);
 	push(@vs_names, @page_names);
 
