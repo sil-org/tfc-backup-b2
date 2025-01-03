@@ -137,7 +137,7 @@ do {
 	# Get the Variable Set IDs from this page
     $jq_cmd = "cat $tmpfile | jq '.data[].id'";
     my @page_ids = `$jq_cmd`;
-    grep($_ =~ s/"//g && 0, @page_ids);
+    @page_ids = map { s/"//gr } @page_ids;
     chomp(@page_ids);
     push(@vs_ids, @page_ids);
 
