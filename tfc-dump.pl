@@ -117,60 +117,70 @@ my @vs_ids;
 my $pg_size = 100;
 my $pg_num = 1;
 my $total_count;
+my $items_processed = 0;
 my $tmpfile = `mktemp`;
 chomp($tmpfile);
 
+# Get all variable sets across pages
 do {
 	$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}&page%5number%5D=${pg_num}\"";
 	$curl_cmd   = "curl $curl_headers --output $tmpfile $curl_query";
 	system($curl_cmd);
 
-	# Get the Variable Set names
+# Get the Variable Set names for this page
 	$jq_cmd   = "cat $tmpfile | jq '.data[].attributes.name'";
 	my @page_names = `$jq_cmd`;
-
-	# Remove the double quotes in each element of the array.
 	@page_names = map { s/"//gr } @page_names;
 	chomp(@page_names);
 	push(@vs_names, @page_names);
 
-	# Get the Variable Set IDs from this page
+# Get the Variable Set IDs for this page
     $jq_cmd = "cat $tmpfile | jq '.data[].id'";
     my @page_ids = `$jq_cmd`;
     @page_ids = map { s/"//gr } @page_ids;
     chomp(@page_ids);
     push(@vs_ids, @page_ids);
 
-	# Get pagination metadata
-    $jq_cmd = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
+# Update counts
+    my $page_items = scalar(@page_ids);
+    $items_processed += $page_items;
+
+# Get total count from pagination metadata if not already set
+if ($total_count == 0) {
+	$jq_cmd = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
     $total_count = `$jq_cmd`;
     chomp($total_count);
-    $pg_num++;
-} 
-while (scalar(@vs_ids) < $total_count);
+}
 
+# Provide Feedback
+print "Processed $items_processed of $total_count Variable Set\n" unless $quiet_mode;
+$pg_num++;
+} while ($items_processed < $total_count);
+
+# Process the variable sets
 my $filename;
 for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 	$filename = $vs_names[$ii];
 	$filename =~ s/ /-/g;	# replace spaces with hyphens
 
-	# Get the Variable Set
+# Get the Variable Set
 	$curl_query = "\"https://app.terraform.io/api/v2/varsets/$vs_ids[$ii]\"";
 	$curl_cmd   = "curl $curl_headers --output varset-${filename}-attributes.json $curl_query";
 	system($curl_cmd);
 
-	# Get the variables within the Variable Set
+# Get the variables within the Variable Set
 	$curl_query = "\"https://app.terraform.io/api/v2/varsets/$vs_ids[$ii]/relationships/vars\"";
 	$curl_cmd   = "curl $curl_headers --output varset-${filename}-variables.json $curl_query";
 	system($curl_cmd);
 }
 
-# Get the number of Variable Sets
-# $jq_cmd      = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
-# $total_count = `$jq_cmd`;
-	unlink($tmpfile);
-# if ($total_count > $pg_size) {
-# 	print STDERR "WARNING: ${total_count}-${pg_size} Variable Sets were not backed up.\n";
-# 	exit(1);
-# }
+unlink($tmpfile);
+
+# Provide final status
+if ($items_processed != $total_count) {
+    print STDERR "WARNING: Only processed ${items_processed} of ${total_count} Variable Sets.\n";
+    exit(1);
+} else {
+    print "Successfully processed all ${total_count} Variable Sets\n" unless $quiet_mode;
+}
 exit(0);
