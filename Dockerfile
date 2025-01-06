@@ -18,7 +18,9 @@ RUN cd /tmp \
  && rm LICENSE README.md ${tfc_ops_distrib} \
  && mv tfc-ops /usr/local/bin \
  && apk update \
- && apk add --no-cache perl jq curl \
+ && apk add --no-cache perl perl-app-cpanminus jq curl \
+ && cpanm --no-wget Sentry::SDK \
+ && rm -rf /root/.cpanm \
  && rm -rf /var/cache/apk/*
 
 COPY ./tfc-backup-b2.sh  /usr/local/bin/tfc-backup-b2.sh
