@@ -36,11 +36,11 @@ my $help;
 
 Getopt::Long::Configure qw(gnu_getopt);
 GetOptions(
-    'org|o=s'       => \$tfc_org_name,
-    'workspace|w=s' => \$tfc_workspace_name,
-    'all|a'         => \$all_workspaces,
-    'quiet|q'       => \$quiet_mode,
-    'help|h'        => \$help
+        'org|o=s'       => \$tfc_org_name,
+        'workspace|w=s' => \$tfc_workspace_name,
+        'all|a'         => \$all_workspaces,
+        'quiet|q'       => \$quiet_mode,
+        'help|h'        => \$help
 ) or die $usage;
 
 die $usage if (!defined($tfc_org_name) || defined($help));
@@ -55,7 +55,7 @@ if (! $ENV{ATLAS_TOKEN}) {
 }
 
 my $curl_header1 = "--header \"Authorization: Bearer $ENV{ATLAS_TOKEN}\"";
-my $curl_header2 = '--header "Content-Type: application/vnd.api+json"';
+my $curl_header2 = "--header \"Content-Type: application/vnd.api+json"";
 my $curl_headers = "$curl_header1 $curl_header2";
 if (defined($quiet_mode)) {
     $curl_headers .= " --no-progress-meter";
