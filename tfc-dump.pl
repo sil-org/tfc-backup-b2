@@ -20,10 +20,10 @@ use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
 
-# Simple function to log errors to Sentry if available
+# Function to log errors to Sentry
 sub error_to_sentry {
     my ($message) = @_;
-    system("sentry-cli send-event --message \"$message\" 2>/dev/null") if $ENV{SENTRY_DSN};
+    system("sentry-cli send-event \"$message\" 2>/dev/null") if $ENV{SENTRY_DSN};
 }
 
 my $usage = "Usage: $0 --org=org-name {--workspace=name | --all} [--quiet] [--help]\n";
@@ -71,7 +71,12 @@ if (defined($tfc_workspace_name)) {	# One workspace desired
     $curl_cmd   = "curl $curl_headers $curl_query";
     $jq_cmd     = "jq '.data.id'";
 
-    $tfc_workspace_id = `$curl_cmd | $jq_cmd`;
+    system("$curl_cmd | $jq_cmd > /tmp/workspace_id.txt");
+    $tfc_workspace_id = do {
+        local(@ARGV, $/) = '/tmp/workspace_id.txt';
+        <>;
+    };
+    system("rm -f /tmp/workspace_id.txt");
     if ($?) {
         my $error = "Failed to get workspace ID for $tfc_workspace_name";
         error_to_sentry($error);
@@ -85,7 +90,12 @@ if (defined($tfc_workspace_name)) {	# One workspace desired
 else {	# All workspaces desired
     my $tfc_ops_cmd = "tfc-ops workspaces list --organization ${tfc_org_name} --attributes name,id";
 
-    my @result = `$tfc_ops_cmd`;
+    system("$tfc_ops_cmd > /tmp/tfc_ops_result.txt");
+    my @result = do {
+        local(@ARGV, $/) = '/tmp/tfc_ops_result.txt';
+        <>;
+    };
+    system("rm -f /tmp/tfc_ops_result.txt");
     if ($?) {
         my $error = "Failed to list workspaces";
         error_to_sentry($error);
@@ -127,51 +137,93 @@ foreach (sort keys %workspace_list) {
 }
 
 # Dump the variable sets data to files.
-
-### WARNING ###
-#
-# This code assumes that all of the TFC Variable Sets are contained within
-# the first result page of 100 entries.  This was true for SIL in August 2024.
-#
-####
-
 my @vs_names;
 my @vs_ids;
-my $pg_size = 100;
+my $pg_size = 20;  # Default page size per Hashicorp documentation
+my $pg_num = 1;    # Start with page 1
 my $total_count;
-my $tmpfile = `mktemp`;
+my $total_processed = 0;
+my $tmpfile;
+system("mktemp > /tmp/tmpfile.txt");
+$tmpfile = do {
+    local(@ARGV, $/) = '/tmp/tmpfile.txt';
+    <>;
+};
+system("rm -f /tmp/tmpfile.txt");
 chomp($tmpfile);
 
-$curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}\"";
-$curl_cmd   = "curl $curl_headers --output $tmpfile $curl_query";
-if (system($curl_cmd) != 0) {
-    my $error = "Failed to fetch variable sets";
+do {
+    # Get the current page of variable sets
+    $curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}&page%5Bnumber%5D=${pg_num}\"";
+    $curl_cmd = "curl $curl_headers --output $tmpfile $curl_query";
+    
+    if (system($curl_cmd) != 0) {
+        my $error = "Failed to fetch variable sets page $pg_num";
+        error_to_sentry($error);
+        print STDERR "$error\n";
+        last;
+    }
+
+    # Get the Variable Set names for this page
+    $jq_cmd = "cat $tmpfile | jq '.data[].attributes.name'";
+    system("$jq_cmd > /tmp/page_names.txt");
+    my @page_names = do {
+        local(@ARGV, $/) = '/tmp/page_names.txt';
+        <>;
+    };
+    system("rm -f /tmp/page_names.txt");
+    @page_names = map { s/"//gr } @page_names;
+    chomp(@page_names);
+    push(@vs_names, @page_names);
+
+    # Get the Variable Set IDs for this page
+    $jq_cmd = "cat $tmpfile | jq '.data[].id'";
+    system("$jq_cmd > /tmp/page_ids.txt");
+    my @page_ids = do {
+        local(@ARGV, $/) = '/tmp/page_ids.txt';
+        <>;
+    };
+    system("rm -f /tmp/page_ids.txt");
+    @page_ids = map { s/"//gr } @page_ids;
+    chomp(@page_ids);
+    push(@vs_ids, @page_ids);
+
+    # Get total count if we haven't yet
+    if (!defined($total_count)) {
+        $jq_cmd = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
+        system("$jq_cmd > /tmp/total_count.txt");
+        $total_count = do {
+            local(@ARGV, $/) = '/tmp/total_count.txt';
+            <>;
+        };
+        system("rm -f /tmp/total_count.txt");
+        chomp($total_count);
+        print "Total variable sets to process: $total_count\n" unless defined($quiet_mode);
+    }
+
+    $total_processed += scalar(@page_names);
+    print "Processed $total_processed of $total_count variable sets\n" unless defined($quiet_mode);
+
+    $pg_num++;
+} while ($total_processed < $total_count);
+
+# Verify we got everything we expected
+if ($total_processed != $total_count) {
+    my $error = "Warning: Expected $total_count variable sets but processed $total_processed";
     error_to_sentry($error);
     print STDERR "$error\n";
 }
 
-# Get the Variable Set names
-$jq_cmd   = "cat $tmpfile | jq '.data[].attributes.name'";
-@vs_names = `$jq_cmd`;
-# Remove the double quotes in each element of the array.
-grep($_ =~ s/"//g && 0, @vs_names);	# Programming Perl, p. 221, 1990
-chomp(@vs_names);
-
-# Get the Variable Set IDs
-$jq_cmd = "cat $tmpfile | jq '.data[].id'";
-@vs_ids = `$jq_cmd`;
-# Remove the double quotes in each element of the array.
-grep($_ =~ s/"//g && 0, @vs_ids);	# Programming Perl, p. 221, 1990
-chomp(@vs_ids);
+print "Successfully processed all $total_count variable sets\n" unless defined($quiet_mode);
 
 my $filename;
 for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
     $filename = $vs_names[$ii];
-    $filename =~ s/ /-/g;	# replace spaces with hyphens
+    $filename =~ s/ /-/g;    # replace spaces with hyphens
 
     # Get the Variable Set
     $curl_query = "\"https://app.terraform.io/api/v2/varsets/$vs_ids[$ii]\"";
-    $curl_cmd   = "curl $curl_headers --output varset-${filename}-attributes.json $curl_query";
+    $curl_cmd = "curl $curl_headers --output varset-${filename}-attributes.json $curl_query";
     if (system($curl_cmd) != 0) {
         my $error = "Failed to dump varset attributes for $filename";
         error_to_sentry($error);
@@ -180,7 +232,7 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
 
     # Get the variables within the Variable Set
     $curl_query = "\"https://app.terraform.io/api/v2/varsets/$vs_ids[$ii]/relationships/vars\"";
-    $curl_cmd   = "curl $curl_headers --output varset-${filename}-variables.json $curl_query";
+    $curl_cmd = "curl $curl_headers --output varset-${filename}-variables.json $curl_query";
     if (system($curl_cmd) != 0) {
         my $error = "Failed to dump varset variables for $filename";
         error_to_sentry($error);
@@ -188,16 +240,5 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
     }
 }
 
-# Get the number of Variable Sets
-$jq_cmd      = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
-$total_count = `$jq_cmd`;
 unlink($tmpfile);
-
-if ($total_count > $pg_size) {
-    my $error = "WARNING: ${total_count}-${pg_size} Variable Sets were not backed up.";
-    error_to_sentry($error);
-    print STDERR "$error\n";
-    exit(1);
-}
-
 exit(0);
