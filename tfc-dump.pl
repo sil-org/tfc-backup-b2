@@ -55,7 +55,7 @@ if (! $ENV{ATLAS_TOKEN}) {
 }
 
 my $curl_header1 = "--header \"Authorization: Bearer $ENV{ATLAS_TOKEN}\"";
-my $curl_header2 = "--header \"Content-Type: application/vnd.api+json"";
+my $curl_header2 = "--header \"Content-Type: application/vnd.api+json\"";
 my $curl_headers = "$curl_header1 $curl_header2";
 if (defined($quiet_mode)) {
     $curl_headers .= " --no-progress-meter";

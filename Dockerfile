@@ -23,7 +23,6 @@ RUN cd /tmp \
     perl \
     jq \
     curl \
-    bash \
  && curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION}" sh \
  && rm -rf /var/cache/apk/*
 
