@@ -19,11 +19,33 @@
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
+use File::Slurp qw(read_file);
+use File::Spec;
 
 # Function to log errors to Sentry
 sub error_to_sentry {
     my ($message) = @_;
     system("sentry-cli send-event \"$message\" 2>/dev/null") if $ENV{SENTRY_DSN};
+}
+
+# slurp output function
+sub slurp_output {
+    my ($command, $filename) = @_;
+    
+    my $tmp_file = File::Spec->catfile('/tmp', $filename);
+    
+    system("$command > $tmp_file");
+    if ($?) {
+        my $error = "Failed to execute command: $command";
+        error_to_sentry($error);
+        die "$error\n";
+    }
+    
+    my $content = read_file($tmp_file);
+    unlink($tmp_file);
+    
+    chomp($content);
+    return $content;
 }
 
 my $usage = "Usage: $0 --org=org-name {--workspace=name | --all} [--quiet] [--help]\n";
@@ -71,31 +93,15 @@ if (defined($tfc_workspace_name)) {	# One workspace desired
     $curl_cmd   = "curl $curl_headers $curl_query";
     $jq_cmd     = "jq '.data.id'";
 
-    system("$curl_cmd | $jq_cmd > /tmp/workspace_id.txt");
-    $tfc_workspace_id = do {
-        local(@ARGV, $/) = '/tmp/workspace_id.txt';
-        <>;
-    };
-    system("rm -f /tmp/workspace_id.txt");
-    if ($?) {
-        my $error = "Failed to get workspace ID for $tfc_workspace_name";
-        error_to_sentry($error);
-        die "$error\n";
-    }
+    $tfc_workspace_id = slurp_output("$curl_cmd | $jq_cmd", "workspace_id.txt");
     $tfc_workspace_id =~ s/"//g;
-    chomp($tfc_workspace_id);
-
+    
     $workspace_list{$tfc_workspace_name} = $tfc_workspace_id;
 }
 else {	# All workspaces desired
     my $tfc_ops_cmd = "tfc-ops workspaces list --organization ${tfc_org_name} --attributes name,id";
 
-    system("$tfc_ops_cmd > /tmp/tfc_ops_result.txt");
-    my @result = do {
-        local(@ARGV, $/) = '/tmp/tfc_ops_result.txt';
-        <>;
-    };
-    system("rm -f /tmp/tfc_ops_result.txt");
+    my @result = split(/\n/, slurp_output($tfc_ops_cmd, "tfc_ops_result.txt"));
     if ($?) {
         my $error = "Failed to list workspaces";
         error_to_sentry($error);
@@ -105,7 +111,6 @@ else {	# All workspaces desired
     # tfc-ops prints two header lines before the data we want to see.
     shift(@result);		# remove "Getting list of workspaces ..."
     shift(@result);		# remove "name, id"
-    chomp(@result);		# remove newlines
 
     my $name;
     my $id;
@@ -161,7 +166,8 @@ do {
         my $error = "Failed to fetch variable sets page $pg_num";
         error_to_sentry($error);
         print STDERR "$error\n";
-        last;
+        unlink($tmpfile);
+        exit(1);
     }
 
     # Get the Variable Set names for this page
