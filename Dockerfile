@@ -21,6 +21,8 @@ RUN cd /tmp \
  && apk update \
  && apk add --no-cache \
     perl \
+    perl-file-slurp \
+    perl-file-temp \
     jq \
     curl \
  && curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION}" sh \

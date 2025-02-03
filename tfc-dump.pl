@@ -21,6 +21,7 @@ use warnings;
 use Getopt::Long qw(GetOptions);
 use File::Slurp qw(read_file);
 use File::Spec;
+use File::Temp;
 
 # Function to log errors to Sentry
 sub error_to_sentry {
@@ -28,24 +29,34 @@ sub error_to_sentry {
     system("sentry-cli send-event \"$message\" 2>/dev/null") if $ENV{SENTRY_DSN};
 }
 
-# slurp output function
-sub slurp_output {
-    my ($command, $filename) = @_;
+# Command output handling functions
+sub slurp_to_file {
+    my ($command) = @_;
+    my $tmp = File::Temp->new();
     
-    my $tmp_file = File::Spec->catfile('/tmp', $filename);
-    
-    system("$command > $tmp_file");
+    system("$command > " . $tmp->filename);
     if ($?) {
         my $error = "Failed to execute command: $command";
         error_to_sentry($error);
         die "$error\n";
     }
-    
-    my $content = read_file($tmp_file);
-    unlink($tmp_file);
-    
+    return $tmp;
+}
+
+sub slurp_string_output {
+    my ($command) = @_;
+    my $tmp = slurp_to_file($command);
+    my $content = read_file($tmp->filename);
     chomp($content);
     return $content;
+}
+
+sub slurp_array_output {
+    my ($command) = @_;
+    my $tmp = slurp_to_file($command);
+    my @content = read_file($tmp->filename);
+    chomp(@content);
+    return @content;
 }
 
 my $usage = "Usage: $0 --org=org-name {--workspace=name | --all} [--quiet] [--help]\n";
@@ -86,22 +97,21 @@ my $curl_query;
 my $curl_cmd;
 my $jq_cmd;
 my %workspace_list;
-if (defined($tfc_workspace_name)) {	# One workspace desired
 
+if (defined($tfc_workspace_name)) {	# One workspace desired
     # Get the workspace ID given the workspace name.
     $curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/workspaces/${tfc_workspace_name}\"";
     $curl_cmd   = "curl $curl_headers $curl_query";
     $jq_cmd     = "jq '.data.id'";
 
-    $tfc_workspace_id = slurp_output("$curl_cmd | $jq_cmd", "workspace_id.txt");
+    $tfc_workspace_id = slurp_string_output("$curl_cmd | $jq_cmd");
     $tfc_workspace_id =~ s/"//g;
     
     $workspace_list{$tfc_workspace_name} = $tfc_workspace_id;
 }
 else {	# All workspaces desired
     my $tfc_ops_cmd = "tfc-ops workspaces list --organization ${tfc_org_name} --attributes name,id";
-
-    my @result = split(/\n/, slurp_output($tfc_ops_cmd, "tfc_ops_result.txt"));
+    my @result = slurp_array_output($tfc_ops_cmd);
     if ($?) {
         my $error = "Failed to list workspaces";
         error_to_sentry($error);
@@ -112,10 +122,8 @@ else {	# All workspaces desired
     shift(@result);		# remove "Getting list of workspaces ..."
     shift(@result);		# remove "name, id"
 
-    my $name;
-    my $id;
     foreach (@result) {
-        ($name, $id) = split(/, /, $_);
+        my ($name, $id) = split(/, /, $_);
         $workspace_list{$name} = $id;
     }
 }
@@ -148,62 +156,36 @@ my $pg_size = 20;  # Default page size per Hashicorp documentation
 my $pg_num = 1;    # Start with page 1
 my $total_count;
 my $total_processed = 0;
-my $tmpfile;
-system("mktemp > /tmp/tmpfile.txt");
-$tmpfile = do {
-    local(@ARGV, $/) = '/tmp/tmpfile.txt';
-    <>;
-};
-system("rm -f /tmp/tmpfile.txt");
-chomp($tmpfile);
+my $tmp = File::Temp->new();
 
 do {
     # Get the current page of variable sets
     $curl_query = "\"https://app.terraform.io/api/v2/organizations/${tfc_org_name}/varsets?page%5Bsize%5D=${pg_size}&page%5Bnumber%5D=${pg_num}\"";
-    $curl_cmd = "curl $curl_headers --output $tmpfile $curl_query";
+    $curl_cmd = "curl $curl_headers --output " . $tmp->filename . " $curl_query";
     
     if (system($curl_cmd) != 0) {
         my $error = "Failed to fetch variable sets page $pg_num";
         error_to_sentry($error);
         print STDERR "$error\n";
-        unlink($tmpfile);
         exit(1);
     }
 
     # Get the Variable Set names for this page
-    $jq_cmd = "cat $tmpfile | jq '.data[].attributes.name'";
-    system("$jq_cmd > /tmp/page_names.txt");
-    my @page_names = do {
-        local(@ARGV, $/) = '/tmp/page_names.txt';
-        <>;
-    };
-    system("rm -f /tmp/page_names.txt");
+    $jq_cmd = "cat " . $tmp->filename . " | jq '.data[].attributes.name'";
+    my @page_names = slurp_array_output($jq_cmd);
     @page_names = map { s/"//gr } @page_names;
-    chomp(@page_names);
     push(@vs_names, @page_names);
 
     # Get the Variable Set IDs for this page
-    $jq_cmd = "cat $tmpfile | jq '.data[].id'";
-    system("$jq_cmd > /tmp/page_ids.txt");
-    my @page_ids = do {
-        local(@ARGV, $/) = '/tmp/page_ids.txt';
-        <>;
-    };
-    system("rm -f /tmp/page_ids.txt");
+    $jq_cmd = "cat " . $tmp->filename . " | jq '.data[].id'";
+    my @page_ids = slurp_array_output($jq_cmd);
     @page_ids = map { s/"//gr } @page_ids;
-    chomp(@page_ids);
     push(@vs_ids, @page_ids);
 
     # Get total count if we haven't yet
     if (!defined($total_count)) {
-        $jq_cmd = "cat $tmpfile | jq '.meta.pagination[\"total-count\"]'";
-        system("$jq_cmd > /tmp/total_count.txt");
-        $total_count = do {
-            local(@ARGV, $/) = '/tmp/total_count.txt';
-            <>;
-        };
-        system("rm -f /tmp/total_count.txt");
-        chomp($total_count);
+        $jq_cmd = "cat " . $tmp->filename . " | jq '.meta.pagination[\"total-count\"]'";
+        $total_count = slurp_string_output($jq_cmd);
         print "Total variable sets to process: $total_count\n" unless defined($quiet_mode);
     }
 
@@ -246,5 +228,4 @@ for (my $ii = 0; $ii < scalar @vs_names; $ii++) {
     }
 }
 
-unlink($tmpfile);
 exit(0);
