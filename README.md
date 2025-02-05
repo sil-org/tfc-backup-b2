@@ -54,10 +54,6 @@ Spaces in the variable set name are replaced with hyphens (`-`).
 * `RESTIC_TAG`         - tag to apply to the backup
 * `SOURCE_PATH`        - Full path to the directory to be backed up
 
-## Restrictions
-The code assumes that all of the Terraform Cloud Variable Sets are contained
-within the first result page of 100 entries.
-
 ## Docker Hub
 This image is built automatically on Docker Hub as [silintl/tfc-backup-b2](https://hub.docker.com/r/silintl/tfc-backup-b2/)
 
