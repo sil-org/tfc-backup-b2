@@ -5,8 +5,9 @@ FROM alpine:3
 ARG restic_ver=0.16.0
 ARG tfc_ops_ver=3.5.4
 ARG tfc_ops_distrib=tfc-ops_Linux_x86_64.tar.gz
+ARG SENTRY_CLI_VERSION=2.41.1
 
-# Install Restic, tfc-ops, perl, and jq
+# Install Restic, tfc-ops, perl, jq, and sentry-cli
 RUN cd /tmp \
  && wget -O /tmp/restic.bz2 \
     https://github.com/restic/restic/releases/download/v${restic_ver}/restic_${restic_ver}_linux_amd64.bz2 \
@@ -18,7 +19,13 @@ RUN cd /tmp \
  && rm LICENSE README.md ${tfc_ops_distrib} \
  && mv tfc-ops /usr/local/bin \
  && apk update \
- && apk add --no-cache perl jq curl \
+ && apk add --no-cache \
+    perl \
+    perl-file-slurp \
+    perl-file-temp \
+    jq \
+    curl \
+ && curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION}" sh \
  && rm -rf /var/cache/apk/*
 
 COPY ./tfc-backup-b2.sh  /usr/local/bin/tfc-backup-b2.sh
