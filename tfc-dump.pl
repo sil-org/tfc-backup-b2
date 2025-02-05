@@ -20,7 +20,6 @@ use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
 use File::Slurp qw(read_file);
-use File::Spec;
 use File::Temp;
 
 # Function to log errors to Sentry
@@ -152,7 +151,7 @@ foreach (sort keys %workspace_list) {
 # Dump the variable sets data to files.
 my @vs_names;
 my @vs_ids;
-my $pg_size = 20;  # Default page size per Hashicorp documentation
+my $pg_size = 100;  # Default page size per Hashicorp documentation
 my $pg_num = 1;    # Start with page 1
 my $total_count;
 my $total_processed = 0;
