@@ -5,8 +5,8 @@ myname="tfc-backup-b2"
 
 # Function to log errors to Sentry
 error_to_sentry() {
-    if [ -n "$SENTRY_DSN" ]; then
-        sentry-cli send-event "$1" 2>/dev/null
+    if [ -n "$SENTRY_DSN" ] && command -v sentry-cli >/dev/null 2>&1; then
+        jq -n --arg msg "$1" '{message: $msg, level: "error"}' | sentry-cli send-event --stdin 2>/dev/null
     fi
 }
 
