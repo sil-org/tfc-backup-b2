@@ -25,7 +25,10 @@ use File::Temp;
 # Function to log errors to Sentry
 sub error_to_sentry {
     my ($message) = @_;
-    system("sentry-cli send-event \"$message\" 2>/dev/null") if $ENV{SENTRY_DSN};
+    if ($ENV{SENTRY_DSN}) {
+        my $json = "{\"message\":\"$message\",\"level\":\"error\"}";
+        system("echo '$json' | sentry-cli send-event --stdin 2>/dev/null");
+    }
 }
 
 # Command output handling functions
