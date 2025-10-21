@@ -14,7 +14,7 @@ RUN cd /tmp \
  && bunzip2 /tmp/restic.bz2 \
  && chmod +x /tmp/restic \
  && mv /tmp/restic /usr/local/bin/restic \
- && wget https://github.com/silinternational/tfc-ops/releases/download/v${tfc_ops_ver}/${tfc_ops_distrib} \
+ && wget https://github.com/sil-org/tfc-ops/releases/download/v${tfc_ops_ver}/${tfc_ops_distrib} \
  && tar zxf ${tfc_ops_distrib} \
  && rm LICENSE README.md ${tfc_ops_distrib} \
  && mv tfc-ops /usr/local/bin \
